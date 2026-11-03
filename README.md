@@ -22,7 +22,8 @@ DRIVE/
 | Path | What |
 | --- | --- |
 | `server/` | Go launcher and server: library scan and validation, token auth, content serving. The built UI is embedded from `server/webdist`. |
-| `web/` | Svelte 5 + Vite UI. Uses system fonts only, no network requests. |
+| `web/` | Svelte 5 + TypeScript + Vite UI, styled with Tailwind v4 and [shadcn-svelte](https://www.shadcn-svelte.com) (the "vega" style with the neutral base color). The Geist font is bundled locally, so the UI makes no network requests. |
+| `web/src/lib/components/ui/` | shadcn-svelte components. These are copied source files that we own and can edit. Add more with `npx shadcn-svelte@latest add <name> -y`. |
 | `scripts/make-test-drive.mjs` | Generates `test-drive/OfflineLibrary` (sample PDF pack plus a deliberately incomplete maps pack). |
 | `scripts/build.ps1` | Builds the UI, cross-compiles all four launchers, and assembles `dist/drive`. |
 

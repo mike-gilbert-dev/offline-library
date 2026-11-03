@@ -23,6 +23,8 @@ Write-Host '== Building UI'
 Push-Location (Join-Path $root 'web')
 try {
   if (-not (Test-Path node_modules)) { npm install; if ($LASTEXITCODE) { throw 'npm install failed' } }
+  npm run check
+  if ($LASTEXITCODE) { throw 'UI type check failed' }
   npm run build
   if ($LASTEXITCODE) { throw 'UI build failed' }
 } finally { Pop-Location }
