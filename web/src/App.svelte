@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import type { Library } from '$lib/types.js';
   import PackCard from './PackCard.svelte';
+  import Viewer from './Viewer.svelte';
 
   import LibraryIcon from '@lucide/svelte/icons/library-big';
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
@@ -47,14 +48,44 @@
     }
   }
 
+  // Hash routes: "#/" is the library, "#/pack/<id>/<article path>" a viewer.
+  let hash = $state(location.hash);
+  let contentOrigin = $state('');
+
+  const route = $derived.by(() => {
+    const m = /^#\/pack\/([^/]+)\/?(.*)$/.exec(hash);
+    return m ? { packId: decodeURIComponent(m[1]), path: m[2] } : null;
+  });
+  const viewerPack = $derived(
+    route && lib?.packs.find((p) => p.status === 'ok' && p.manifest?.packId === route.packId),
+  );
+
   onMount(() => {
     refresh();
+    api<{ contentOrigin: string }>('/api/config').then((c) => (contentOrigin = c.contentOrigin)).catch(() => {});
     const id = setInterval(checkStatus, 3000);
-    return () => clearInterval(id);
+    const onHash = () => {
+      // The viewer rewrites the article path with replaceState (no event);
+      // only react when switching between library and a different pack.
+      const next = location.hash;
+      const pack = (h: string) => /^#\/pack\/([^/]+)/.exec(h)?.[1] ?? '';
+      if (pack(next) !== pack(hash) || !next.startsWith('#/pack/')) hash = next;
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('hashchange', onHash);
+    };
   });
 
   const readyCount = $derived(lib?.packs.filter((p) => p.status === 'ok').length ?? 0);
 </script>
+
+{#if route && viewerPack && contentOrigin && !serverDown && lib?.available}
+  {#key route.packId}
+    <Viewer pack={viewerPack} {contentOrigin} initialPath={route.path} />
+  {/key}
+{:else}
 
 <header class="bg-background/80 sticky top-0 z-10 border-b backdrop-blur">
   <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -131,3 +162,4 @@
     </p>
   {/if}
 </main>
+{/if}

@@ -19,6 +19,7 @@ const SupportedSchema = 1
 // other format are shown as "unsupported" rather than treated as broken.
 var supportedFormats = map[string]bool{
 	"pdf": true,
+	"zim": true,
 }
 
 var packIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)

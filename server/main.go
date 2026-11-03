@@ -35,9 +35,12 @@ type server struct {
 	root string
 	lib  *Library
 
-	token string // required (via cookie) on every request outside dev mode
-	host  string // expected Host header, e.g. "127.0.0.1:53211"
-	dev   bool
+	token       string // required (via cookie) on every request outside dev mode
+	host        string // expected Host header for the app, e.g. "127.0.0.1:53211"
+	contentHost string // pack content is served from this second origin
+	dev         bool
+
+	archives archiveSet
 }
 
 func main() {
@@ -61,15 +64,32 @@ func main() {
 		log.Fatalf("could not start the local server: %v", err)
 	}
 
-	s := &server{root: root, token: randomToken(), host: ln.Addr().String(), dev: *dev}
+	// Pack content (e.g. Wikipedia pages and their scripts) gets its own
+	// origin on a second port, so it can't call the app's API or read its pages.
+	contentPort := 0
+	if *dev {
+		contentPort = *port + 1
+	}
+	cln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", contentPort))
+	if err != nil {
+		log.Fatalf("could not start the local content server: %v", err)
+	}
+
+	s := &server{root: root, token: randomToken(), host: ln.Addr().String(), contentHost: cln.Addr().String(), dev: *dev}
 	s.lib = Scan(root)
 
 	srv := &http.Server{Handler: s.routes(), ReadHeaderTimeout: 10 * time.Second}
-	go func() {
-		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
-		}
-	}()
+	csrv := &http.Server{Handler: s.contentRoutes(), ReadHeaderTimeout: 10 * time.Second}
+	for _, pair := range []struct {
+		srv *http.Server
+		ln  net.Listener
+	}{{srv, ln}, {csrv, cln}} {
+		go func() {
+			if err := pair.srv.Serve(pair.ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatal(err)
+			}
+		}()
+	}
 
 	base := "http://" + s.host + "/"
 	openURL := base + "auth?token=" + s.token
@@ -96,6 +116,8 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+	_ = csrv.Shutdown(shutdownCtx)
+	s.archives.closeAll()
 }
 
 // resolveLibraryRoot picks the library folder: the -library flag, else an
@@ -133,6 +155,9 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("GET /api/library", s.handleLibrary)
 	mux.HandleFunc("POST /api/rescan", s.handleRescan)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
+	mux.HandleFunc("GET /api/config", s.handleConfig)
+	mux.HandleFunc("GET /api/packs/{id}/zim", s.handleZimInfo)
+	mux.HandleFunc("GET /api/packs/{id}/search", s.handleZimSearch)
 	mux.HandleFunc("GET /content/{pack}/{path...}", s.handleContent)
 
 	ui, err := fs.Sub(webFS, "webdist")
@@ -142,7 +167,7 @@ func (s *server) routes() http.Handler {
 	files := http.FileServer(http.FS(ui))
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+			"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src http://"+s.contentHost)
 		files.ServeHTTP(w, r)
 	}))
 	return s.guard(mux)
@@ -206,7 +231,13 @@ func (s *server) handleRescan(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.lib = lib
 	s.mu.Unlock()
+	// Reopen archives on next use: the drive may have been swapped or reconnected.
+	s.archives.closeAll()
 	writeJSON(w, lib)
+}
+
+func (s *server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]string{"contentOrigin": "http://" + s.contentHost})
 }
 
 // handleStatus is a cheap availability check the UI polls to notice the

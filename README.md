@@ -24,6 +24,9 @@ DRIVE/
 | `server/` | Go launcher and server: library scan and validation, token auth, content serving. The built UI is embedded from `server/webdist`. |
 | `web/` | Svelte 5 + TypeScript + Vite UI, styled with Tailwind v4 and [shadcn-svelte](https://www.shadcn-svelte.com) (the "vega" style with the neutral base color). The Geist font is bundled locally, so the UI makes no network requests. |
 | `web/src/lib/components/ui/` | shadcn-svelte components. These are copied source files that we own and can edit. Add more with `npx shadcn-svelte@latest add <name> -y`. |
+| `server/zim/` | Pure-Go ZIM reader. It supports format v5 and v6, old and new namespaces, xz and zstd clusters, redirects, and title-prefix search. It reads with random access, so archives are never loaded into memory. |
+| `server/zimserve.go` | Serves ZIM content from a **second origin** (a separate port) so pack scripts can't reach the app API. Also serves the ZIM search and info API. |
+| `scripts/fetch-sample-zim.ps1` | Downloads the sample Wikipedia ZIM (~51 MB) and checks its SHA-256. The file is too large for git, so it's not committed. |
 | `scripts/make-test-drive.mjs` | Generates `test-drive/OfflineLibrary` (sample PDF pack plus a deliberately incomplete maps pack). |
 | `scripts/build.ps1` | Builds the UI, cross-compiles all four launchers, and assembles `dist/drive`. |
 
@@ -73,8 +76,21 @@ Tests: `cd server; go test ./...`
   symlinks may not escape the pack folder.
 - The library is opened read-only. Nothing is written to the drive.
 
+## ZIM (Wikipedia) packs
+
+- Run `scripts\fetch-sample-zim.ps1` once to add the sample Wikipedia pack to `test-drive`.
+- Packs open in an in-app viewer (`#/pack/<id>/<article>`). The article is shown in a
+  sandboxed iframe served from the content origin. Its CSP allows only the
+  archive's own scripts and assets and forbids every network request
+  (`connect-src 'self'`), and only the app may frame it.
+- A small injected script (`/__olib/bridge.js`) reports the current page
+  to the app and intercepts external links. The app asks the user before
+  opening them in the browser.
+- Search is **title-prefix search** (fast, using the archive's title index). Full-text
+  search would need the archive's embedded Xapian index, which has no Go
+  implementation.
+
 ## Status
 
-Phase 0 / step 1–2 of the plan: launcher, manifest validation, pack catalog,
-and PDFs opening in the browser's built-in viewer. Next: test from the
-exFAT drive with networking off, then the ZIM and map spikes.
+Phase 0: the launcher, manifest validation, pack catalog, PDFs, and the ZIM spike
+all work. Next: the map spike, then a test on macOS.

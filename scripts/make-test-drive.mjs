@@ -4,7 +4,7 @@
 //   practical-manuals  -> a real (generated) PDF: should show "Ready"
 //   regional-maps      -> declares a .pmtiles file that isn't there: shows
 //                         "Incomplete" and "not supported yet"
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -101,11 +101,41 @@ write('packs/regional-maps/pack.json', json({
   source: { name: 'Placeholder', url: '', license: 'n/a', attribution: '' },
 }));
 
+const packs = ['packs/practical-manuals/pack.json', 'packs/regional-maps/pack.json'];
+
+// Wikipedia sample: only listed when the ZIM has been downloaded
+// (scripts/fetch-sample-zim.ps1). It's too large to keep in git.
+const zimDir = join(root, 'packs/wikipedia-physics/content');
+const zimFile = existsSync(zimDir) && readdirSync(zimDir).find((f) => f.endsWith('.zim'));
+if (zimFile) {
+  const size = statSync(join(zimDir, zimFile)).size;
+  write('packs/wikipedia-physics/pack.json', json({
+    schemaVersion: 1,
+    packId: 'wikipedia-physics',
+    title: 'Wikipedia: Physics',
+    description: 'Physics articles from English Wikipedia (Kiwix "mini" edition: introductions and infoboxes).',
+    category: 'encyclopedia',
+    format: 'zim',
+    version: zimFile.match(/(\d{4}-\d{2})\.zim$/)?.[1] ?? 'unknown',
+    languages: ['en'],
+    contentDate: '2026-10-14',
+    entrypoint: `content/${zimFile}`,
+    files: [{ path: `content/${zimFile}`, sizeBytes: size }],
+    source: {
+      name: 'Wikipedia, packaged by Kiwix / openZIM',
+      url: `https://download.kiwix.org/zim/wikipedia/${zimFile}`,
+      license: 'CC BY-SA 4.0',
+      attribution: 'Text and media from Wikipedia contributors',
+    },
+  }));
+  packs.unshift('packs/wikipedia-physics/pack.json');
+}
+
 write('library.json', json({
   schemaVersion: 1,
   libraryId: '8c0bb484-b289-4a54-bbf5-39b237f529aa',
   title: 'Test Drive Library',
-  packs: ['packs/practical-manuals/pack.json', 'packs/regional-maps/pack.json'],
+  packs,
 }));
 
 console.log('Test library written to', root);

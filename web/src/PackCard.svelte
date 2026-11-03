@@ -36,10 +36,14 @@
   };
   const status = $derived(statuses[pack.status]);
 
+  // ZIM packs open in the in-app viewer; PDFs open in the browser's own viewer.
+  const inApp = $derived(m?.format === 'zim');
   const contentUrl = $derived(
-    m
-      ? `/content/${encodeURIComponent(m.packId)}/${m.entrypoint.split('/').map(encodeURIComponent).join('/')}`
-      : '',
+    !m
+      ? ''
+      : inApp
+        ? `#/pack/${encodeURIComponent(m.packId)}/`
+        : `/content/${encodeURIComponent(m.packId)}/${m.entrypoint.split('/').map(encodeURIComponent).join('/')}`,
   );
 
   const details = $derived(
@@ -110,10 +114,14 @@
       {/if}
     </p>
     {#if pack.status === 'ok'}
-      <Button href={contentUrl} target="_blank" rel="noopener" size="sm">
-        Open
-        <ArrowUpRightIcon data-icon="inline-end" />
-      </Button>
+      {#if inApp}
+        <Button href={contentUrl} size="sm">Open</Button>
+      {:else}
+        <Button href={contentUrl} target="_blank" rel="noopener" size="sm">
+          Open
+          <ArrowUpRightIcon data-icon="inline-end" />
+        </Button>
+      {/if}
     {/if}
   </Card.Footer>
 </Card.Root>

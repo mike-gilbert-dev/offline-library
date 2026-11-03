@@ -1,4 +1,6 @@
 node_modules/
 dist/
+test-drive/**/*.zim
+test-drive/OfflineLibrary/packs/wikipedia-physics/
 server/webdist/*
 !server/webdist/.gitkeep
