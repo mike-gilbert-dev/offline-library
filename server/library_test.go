@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"encoding/json"
@@ -77,8 +77,8 @@ func TestScanPackStatuses(t *testing.T) {
 	writePack(t, root, "short", "short", "pdf", "content/a.pdf", 999)
 	write(t, filepath.Join(root, "packs/short/content/a.pdf"), pdf)
 	// unsupported: valid but unknown format
-	writePack(t, root, "maps", "maps", "pmtiles", "content/r.pmtiles", int64(len(pdf)))
-	write(t, filepath.Join(root, "packs/maps/content/r.pmtiles"), pdf)
+	writePack(t, root, "maps", "maps", "epub", "content/r.epub", int64(len(pdf)))
+	write(t, filepath.Join(root, "packs/maps/content/r.epub"), pdf)
 	// invalid: path traversal
 	writePack(t, root, "evil", "evil", "pdf", "../good/content/a.pdf", int64(len(pdf)))
 	// invalid: duplicate id

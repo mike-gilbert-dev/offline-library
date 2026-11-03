@@ -37,7 +37,7 @@
   const status = $derived(statuses[pack.status]);
 
   // ZIM packs open in the in-app viewer; PDFs open in the browser's own viewer.
-  const inApp = $derived(m?.format === 'zim');
+  const inApp = $derived(m?.format === 'zim' || m?.format === 'pmtiles');
   const contentUrl = $derived(
     !m
       ? ''

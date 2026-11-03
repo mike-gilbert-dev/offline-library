@@ -2,5 +2,8 @@ node_modules/
 dist/
 test-drive/**/*.zim
 test-drive/OfflineLibrary/packs/wikipedia-physics/
+test-drive/OfflineLibrary/packs/regional-maps/content/
+test-drive/OfflineLibrary/packs/regional-maps/assets/
+tools/
 server/webdist/*
 !server/webdist/.gitkeep

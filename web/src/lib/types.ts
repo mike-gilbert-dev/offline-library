@@ -21,6 +21,7 @@ export interface PackManifest {
   entrypoint: string;
   files: FileEntry[] | null;
   source: { name: string; url: string; license: string; attribution: string };
+  viewer?: { style?: { light?: string; dark?: string } };
 }
 
 export interface Pack {

@@ -18,8 +18,9 @@ const SupportedSchema = 1
 // supportedFormats lists pack formats this build can open. Packs with any
 // other format are shown as "unsupported" rather than treated as broken.
 var supportedFormats = map[string]bool{
-	"pdf": true,
-	"zim": true,
+	"pdf":     true,
+	"zim":     true,
+	"pmtiles": true,
 }
 
 var packIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
@@ -59,6 +60,10 @@ type PackManifest struct {
 	Entrypoint    string      `json:"entrypoint"`
 	Files         []FileEntry `json:"files"`
 	Source        Source      `json:"source"`
+
+	// Viewer holds format-specific settings (e.g. map style paths). It is
+	// passed through to the UI unchanged; viewers validate what they use.
+	Viewer json.RawMessage `json:"viewer,omitempty"`
 }
 
 // ---- Scan results ----

@@ -90,7 +90,21 @@ Tests: `cd server; go test ./...`
   search would need the archive's embedded Xapian index, which has no Go
   implementation.
 
+## Map (PMTiles) packs
+
+- Run `scripts\fetch-sample-map.ps1` once to build the sample map pack (Washington, D.C.,
+  zoom 0–15, about 56 MB). It needs `tools\pmtiles\pmtiles.exe` from the
+  [go-pmtiles releases](https://github.com/protomaps/go-pmtiles/releases).
+  Pass `-Bbox minLon,minLat,maxLon,maxLat` for another region.
+- A map pack contains the `.pmtiles` archive plus its fonts, icons, and light and dark
+  MapLibre styles (`assets/style-*.json`). Styles refer to pack files as `{base}…`.
+  They contain no internet URLs, and the attribution is plain text.
+- The viewer is MapLibre GL 6 with the pmtiles protocol. It reads tiles over HTTP range requests
+  from `/content/`. It is lazy-loaded, so the library page stays small.
+- Maps support browsing and zooming only. Place search and routing are separate features.
+- Headless Edge with SwiftShader draws only the map background, so check maps in a real browser.
+
 ## Status
 
-Phase 0: the launcher, manifest validation, pack catalog, PDFs, and the ZIM spike
-all work. Next: the map spike, then a test on macOS.
+Phase 0: the launcher, manifest validation, pack catalog, PDFs, ZIM, and map spikes
+all work on Windows. Next: a test on macOS.

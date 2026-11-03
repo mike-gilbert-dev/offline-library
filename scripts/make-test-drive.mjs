@@ -86,20 +86,57 @@ write('packs/practical-manuals/pack.json', json({
   source: { name: 'Generated test content', url: '', license: 'Test data, no restrictions', attribution: '' },
 }));
 
-write('packs/regional-maps/pack.json', json({
-  schemaVersion: 1,
-  packId: 'regional-maps',
-  title: 'Regional Maps (placeholder)',
-  description: 'Declares a map archive that is not included, to test missing-file handling.',
-  category: 'maps',
-  format: 'pmtiles',
-  version: 'dev',
-  languages: ['en'],
-  contentDate: '2026-11-03',
-  entrypoint: 'content/region.pmtiles',
-  files: [{ path: 'content/region.pmtiles', sizeBytes: 1048576 }],
-  source: { name: 'Placeholder', url: '', license: 'n/a', attribution: '' },
-}));
+// Map sample: a real pack when scripts/fetch-sample-map.ps1 has run, otherwise
+// a placeholder that declares a missing file (tests the "incomplete" state).
+const mapDir = join(root, 'packs/regional-maps');
+if (existsSync(join(mapDir, 'content/region.pmtiles'))) {
+  write('packs/regional-maps/pack.json', json({
+    schemaVersion: 1,
+    packId: 'regional-maps',
+    title: 'Washington, D.C. Area Map',
+    description: 'Street-level OpenStreetMap vector map, rendered fully offline.',
+    category: 'maps',
+    format: 'pmtiles',
+    version: '2026-11-02',
+    languages: ['en'],
+    contentDate: '2026-11-02',
+    entrypoint: 'content/region.pmtiles',
+    files: listFiles(mapDir).filter((f) => f.path !== 'pack.json'),
+    viewer: { style: { light: 'assets/style-light.json', dark: 'assets/style-dark.json' } },
+    source: {
+      name: 'OpenStreetMap via Protomaps basemap build',
+      url: 'https://protomaps.com',
+      license: 'ODbL 1.0 (data); OFL (fonts); MIT (icons)',
+      attribution: '© OpenStreetMap contributors',
+    },
+  }));
+} else {
+  write('packs/regional-maps/pack.json', json({
+    schemaVersion: 1,
+    packId: 'regional-maps',
+    title: 'Regional Maps (placeholder)',
+    description: 'Declares a map archive that is not included, to test missing-file handling.',
+    category: 'maps',
+    format: 'pmtiles',
+    version: 'dev',
+    languages: ['en'],
+    contentDate: '2026-11-03',
+    entrypoint: 'content/region.pmtiles',
+    files: [{ path: 'content/region.pmtiles', sizeBytes: 1048576 }],
+    source: { name: 'Placeholder', url: '', license: 'n/a', attribution: '' },
+  }));
+}
+
+function listFiles(dir, prefix = '') {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => !d.name.startsWith('.'))
+    .flatMap((d) =>
+      d.isDirectory()
+        ? listFiles(join(dir, d.name), `${prefix}${d.name}/`)
+        : [{ path: `${prefix}${d.name}`, sizeBytes: statSync(join(dir, d.name)).size }],
+    )
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
 
 const packs = ['packs/practical-manuals/pack.json', 'packs/regional-maps/pack.json'];
 

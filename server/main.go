@@ -167,7 +167,7 @@ func (s *server) routes() http.Handler {
 	files := http.FileServer(http.FS(ui))
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src http://"+s.contentHost)
+			"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src http://"+s.contentHost)
 		files.ServeHTTP(w, r)
 	}))
 	return s.guard(mux)

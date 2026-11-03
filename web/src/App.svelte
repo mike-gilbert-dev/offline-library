@@ -83,7 +83,14 @@
 
 {#if route && viewerPack && contentOrigin && !serverDown && lib?.available}
   {#key route.packId}
-    <Viewer pack={viewerPack} {contentOrigin} initialPath={route.path} />
+    {#if viewerPack.manifest?.format === 'pmtiles'}
+      <!-- MapLibre is ~1 MB, so it is only loaded when a map is opened. -->
+      {#await import('./MapViewer.svelte') then { default: MapViewer }}
+        <MapViewer pack={viewerPack} />
+      {/await}
+    {:else}
+      <Viewer pack={viewerPack} {contentOrigin} initialPath={route.path} />
+    {/if}
   {/key}
 {:else}
 
