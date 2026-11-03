@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "packId": "practical-manuals",
+  "title": "Practical Manuals (sample)",
+  "description": "A generated two-page PDF used to test the PDF viewer.",
+  "category": "manuals",
+  "format": "pdf",
+  "version": "dev",
+  "languages": [
+    "en"
+  ],
+  "contentDate": "2026-11-03",
+  "entrypoint": "content/sample-manual.pdf",
+  "files": [
+    {
+      "path": "content/sample-manual.pdf",
+      "sizeBytes": 1361
+    }
+  ],
+  "source": {
+    "name": "Generated test content",
+    "url": "",
+    "license": "Test data, no restrictions",
+    "attribution": ""
+  }
+}

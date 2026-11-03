@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "packId": "regional-maps",
+  "title": "Regional Maps (placeholder)",
+  "description": "Declares a map archive that is not included, to test missing-file handling.",
+  "category": "maps",
+  "format": "pmtiles",
+  "version": "dev",
+  "languages": [
+    "en"
+  ],
+  "contentDate": "2026-11-03",
+  "entrypoint": "content/region.pmtiles",
+  "files": [
+    {
+      "path": "content/region.pmtiles",
+      "sizeBytes": 1048576
+    }
+  ],
+  "source": {
+    "name": "Placeholder",
+    "url": "",
+    "license": "n/a",
+    "attribution": ""
+  }
+}

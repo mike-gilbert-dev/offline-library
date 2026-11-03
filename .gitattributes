@@ -1,0 +1,5 @@
+# Pack content must stay byte-identical: manifests record exact file sizes.
+test-drive/** -text
+*.pdf binary
+*.zim binary
+*.pmtiles binary

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "libraryId": "8c0bb484-b289-4a54-bbf5-39b237f529aa",
+  "title": "Test Drive Library",
+  "packs": [
+    "packs/practical-manuals/pack.json",
+    "packs/regional-maps/pack.json"
+  ]
+}
