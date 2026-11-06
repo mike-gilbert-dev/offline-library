@@ -63,14 +63,15 @@
           [h.minLon, h.minLat],
           [h.maxLon, h.maxLat],
         ];
-        const pad = Math.max(h.maxLon - h.minLon, h.maxLat - h.minLat) * 0.5;
+        const padLon = (h.maxLon - h.minLon) * 0.5;
+        const padLat = (h.maxLat - h.minLat) * 0.5;
         map = new maplibregl.Map({
           container,
           style,
           bounds,
           maxBounds: [
-            [h.minLon - pad, h.minLat - pad],
-            [h.maxLon + pad, h.maxLat + pad],
+            [h.minLon - padLon, Math.max(h.minLat - padLat, -90)],
+            [h.maxLon + padLon, Math.min(h.maxLat + padLat, 90)],
           ],
           maxZoom: h.maxZoom + 3, // over-zoom past the data's detail level
           attributionControl: { compact: false },
