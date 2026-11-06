@@ -55,6 +55,9 @@ try {
   $env:GOOS = $saved.GOOS; $env:GOARCH = $saved.GOARCH; $env:CGO_ENABLED = $saved.CGO_ENABLED
 }
 
+Write-Host '== Copying helper launchers'
+Copy-Item (Join-Path $root 'launchers\*') $dist
+
 Write-Host '== Copying test library'
 Copy-Item -Recurse (Join-Path $root 'test-drive\OfflineLibrary') (Join-Path $dist 'OfflineLibrary')
 

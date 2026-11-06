@@ -3,3 +3,6 @@ test-drive/** -text
 *.pdf binary
 *.zim binary
 *.pmtiles binary
+# macOS/Linux shell scripts must keep LF line endings.
+*.command text eol=lf
+*.sh text eol=lf
