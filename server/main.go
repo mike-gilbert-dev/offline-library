@@ -30,6 +30,10 @@ import (
 //go:embed all:webdist
 var webFS embed.FS
 
+// version is set at build time: go build -ldflags "-X main.version=v0.2.0".
+// Development builds report "dev".
+var version = "dev"
+
 type server struct {
 	mu   sync.RWMutex
 	root string
@@ -97,7 +101,7 @@ func main() {
 		openURL = base
 	}
 
-	fmt.Println("Offline Library")
+	fmt.Println("Offline Library", version)
 	fmt.Println("  Library:", root)
 	fmt.Printf("  Found %d pack(s)%s\n", len(s.lib.Packs), map[bool]string{true: "", false: " (library not available)"}[s.lib.Available])
 	fmt.Println("  Address:", openURL)
@@ -239,7 +243,7 @@ func (s *server) handleRescan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) handleConfig(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]string{"contentOrigin": "http://" + s.contentHost})
+	writeJSON(w, map[string]string{"contentOrigin": "http://" + s.contentHost, "version": version})
 }
 
 // handleStatus is a cheap availability check the UI polls to notice the

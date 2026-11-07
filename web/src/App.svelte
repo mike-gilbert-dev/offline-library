@@ -52,6 +52,7 @@
   // Hash routes: "#/" is the library, "#/pack/<id>/<article path>" a viewer.
   let hash = $state(location.hash);
   let contentOrigin = $state('');
+  let appVersion = $state('');
 
   const route = $derived.by(() => {
     const m = /^#\/pack\/([^/]+)\/?(.*)$/.exec(hash);
@@ -63,7 +64,12 @@
 
   onMount(() => {
     refresh();
-    api<{ contentOrigin: string }>('/api/config').then((c) => (contentOrigin = c.contentOrigin)).catch(() => {});
+    api<{ contentOrigin: string; version: string }>('/api/config')
+      .then((c) => {
+        contentOrigin = c.contentOrigin;
+        appVersion = c.version;
+      })
+      .catch(() => {});
     const id = setInterval(checkStatus, 3000);
     const onHash = () => {
       // The viewer rewrites the article path with replaceState (no event);
@@ -178,6 +184,7 @@
 
     <p class="text-muted-foreground mt-10 text-xs">
       Library folder: <code class="break-all">{lib.root}</code>
+      {#if appVersion}<span class="ml-2">· Offline Library {appVersion}</span>{/if}
     </p>
   {/if}
 </main>
