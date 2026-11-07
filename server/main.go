@@ -22,6 +22,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -359,12 +360,27 @@ func tokenEqual(a, b string) bool {
 }
 
 func openBrowser(url string) error {
+	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	case "darwin":
-		return exec.Command("open", url).Start()
+		cmd = exec.Command("open", url)
 	default:
-		return exec.Command("xdg-open", url).Start()
+		cmd = exec.Command("xdg-open", url)
 	}
+	cmd.Env = browserEnv(os.Environ())
+	return cmd.Start()
+}
+
+// browserEnv drops the launcher's own settings (notably OLIB_GITHUB_TOKEN)
+// so a browser started from here doesn't inherit them.
+func browserEnv(env []string) []string {
+	out := env[:0:0]
+	for _, kv := range env {
+		if !strings.HasPrefix(strings.ToUpper(kv), "OLIB_") {
+			out = append(out, kv)
+		}
+	}
+	return out
 }

@@ -27,7 +27,7 @@ export type DeliveryStatus = 'sending' | 'relayed' | 'delivered' | 'failed' | 'u
 
 export interface MeshNode {
   num: number;
-  id: string; // "!a0cbd018"
+  id: string; // e.g. "!1a2b3c4d"
   longName: string;
   shortName: string;
   lastHeard?: Date;

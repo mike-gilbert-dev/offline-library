@@ -2,8 +2,13 @@
 
 A portable, offline knowledge library that runs from an external drive.
 A small launcher on the drive starts a local web server bound to `127.0.0.1`
-and opens the computer's own browser. Nothing is installed and nothing is
-fetched from the internet.
+and opens the computer's own browser. Nothing is installed, and the library
+never goes online on its own: the only network feature is an update check
+that runs when the user presses **Check for updates**.
+
+It can also send and receive [Meshtastic](https://meshtastic.org) messages
+through a LoRa radio plugged in over USB, so it stays useful without internet
+or cell service.
 
 ```text
 DRIVE/
@@ -11,11 +16,16 @@ DRIVE/
   start-mac-apple-silicon    ← M1/M2/M3… Macs
   start-mac-intel
   start-linux
+  Start Offline Library.command  ← double-click helper for macOS
   OfflineLibrary/
     library.json             ← lists the packs (authoritative)
     packs/<pack-id>/pack.json
     packs/<pack-id>/content/…
+    data/messages/<node>.jsonl ← Meshtastic message history (created on use)
 ```
+
+Updates replace only the `start-*` launchers; `OfflineLibrary/` is never
+touched by the updater.
 
 ## Layout
 
@@ -28,7 +38,12 @@ DRIVE/
 | `server/zimserve.go` | Serves ZIM content from a **second origin** (a separate port) so pack scripts can't reach the app API. Also serves the ZIM search and info API. |
 | `scripts/fetch-sample-zim.ps1` | Downloads the sample Wikipedia ZIM (~51 MB) and checks its SHA-256. The file is too large for git, so it's not committed. |
 | `scripts/make-test-drive.mjs` | Generates `test-drive/OfflineLibrary` (sample PDF pack plus a deliberately incomplete maps pack). |
-| `scripts/build.ps1` | Builds the UI, cross-compiles all four launchers, and assembles `dist/drive`. |
+| `web/src/messages/` | Meshtastic Messages: radio connection over Web Serial, conversations, delivery status, history. Uses `@meshtastic/core` with our own serial transport and browser shims (see the comments in those files). |
+| `server/messages.go` | Message history API: append-only JSON Lines per radio in `OfflineLibrary/data/messages/`. |
+| `server/update*.go`, `server/releasekey.go`, `server/restart_*.go` | In-app updates: release check, signed-manifest verification, download, file swap and restart. |
+| `server/cmd/releasesign/` | Creates the release signing key and signs `release.json`. |
+| `scripts/build.ps1` | Builds the UI, cross-compiles all four launchers, and assembles `dist/drive`. `-Version v1.2.3` makes a release build. |
+| `scripts/release.ps1` | Builds, signs and zips a release; with `-Publish`, tags, pushes and creates the GitHub release. |
 
 ## Build
 
@@ -36,7 +51,11 @@ DRIVE/
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-Copy everything in `dist\drive` to the root of the exFAT drive.
+For a new drive, copy everything in `dist\drive` to the root of the exFAT
+drive. To update a drive that already has packs, copy only the `start-*` files
+and `Start Offline Library.command` (the `OfflineLibrary` folder in `dist\drive`
+is a small test library). Requires Go and Node.js; the built launchers and UI
+aren't stored in git.
 
 ## Develop
 
@@ -74,7 +93,14 @@ Tests: `cd server; go test ./...`
 - `/content/` serves only files declared in a pack manifest and verified by
   the last scan. Paths can't contain `..`, `\` or `:`, or be absolute, and
   symlinks may not escape the pack folder.
-- The library is opened read-only. Nothing is written to the drive.
+- Packs are opened read-only. The only thing written to the library folder is
+  Meshtastic message history (`OfflineLibrary/data/messages/`), through an API
+  that accepts only an 8-hex-digit node ID as the file name.
+- The update check and install are the only outbound requests, and run only
+  when the user asks. Updates must carry an Ed25519 signature from the
+  release key (public key in `server/releasekey.go`); files are checked
+  against the signed checksums before anything is replaced. No credentials
+  are built into the launcher.
 
 ## ZIM (Wikipedia) packs
 
@@ -104,7 +130,44 @@ Tests: `cd server; go test ./...`
 - Maps support browsing and zooming only. Place search and routing are separate features.
 - Headless Edge with SwiftShader draws only the map background, so check maps in a real browser.
 
+## Messages (Meshtastic)
+
+- Built into the app (the **Messages** button), not a pack. It needs Chrome,
+  Edge or Brave, because it uses Web Serial to reach the radio over USB.
+- Shows channels and direct-message threads with delivery status
+  (delivered, relayed, failed) taken from the radio's routing receipts.
+  Sending on the public channel is turned off for now.
+- History is saved per radio on the drive and loaded when that radio is
+  connected again, on any computer.
+- Tested with Heltec Wireless Tracker radios (ESP32-S3) on firmware 2.6 and
+  2.6 and 2.7. With 2.7, the radio's USB port reboots it into download mode
+  on the esptool DTR/RTS sequence (RTS on with DTR off, then DTR on with RTS
+  off, then both off), so tools that toggle those lines can trigger it.
+  Connecting from the app on 2.7 still needs a full connect/disconnect test.
+
+## Updates and releases
+
+- **Settings → Check for updates** asks GitHub for the latest release;
+  **Install** downloads the launchers for all platforms (so the drive keeps
+  working everywhere), verifies them, swaps them in by renaming (keeping
+  `.old` copies until the new version starts), and restarts.
+- To publish: commit everything on `main`, then
+  `scripts\release.ps1 -Version v1.2.3 -Notes notes.md -Publish`. Without
+  `-Publish` it only builds and signs, for checking.
+- Releases are signed with a private key kept outside the repository
+  (`%USERPROFILE%\.offline-library\release-signing.key` by default). Without
+  that key, no update can be published that existing installs will accept.
+- `OLIB_GITHUB_TOKEN` lets the launcher read releases of a private repository;
+  `OLIB_UPDATE_API` points it at another API server for testing (signatures
+  are still required).
+
+## License
+
+GPL-3.0; see `LICENSE`. Third-party components and their licenses are listed
+in `THIRD_PARTY_NOTICES.md`. To report a security problem, see `SECURITY.md`.
+
 ## Status
 
-Phase 0: the launcher, manifest validation, pack catalog, PDFs, ZIM, and map spikes
-all work on Windows. Next: a test on macOS.
+The launcher, pack catalog, PDFs, ZIM, maps, Meshtastic Messages and in-app
+updates work on Windows; the library, PDFs, ZIM and maps are also verified on
+macOS. Not yet tested: updating on macOS and on an exFAT drive, and Linux.

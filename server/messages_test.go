@@ -31,18 +31,18 @@ func do(t *testing.T, h http.Handler, method, url, body string) *httptest.Respon
 func TestMessagesRoundTrip(t *testing.T) {
 	s, h := newMessagesServer(t)
 
-	if rec := do(t, h, "GET", "/api/messages/a0cbd018", ""); rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != "[]" {
+	if rec := do(t, h, "GET", "/api/messages/1a2b3c4d", ""); rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != "[]" {
 		t.Fatalf("empty history: %d %q", rec.Code, rec.Body.String())
 	}
-	if rec := do(t, h, "POST", "/api/messages/a0cbd018", `[{"t":"msg","id":1,"text":"hi\nthere"}, {"t":"status","id":1,"status":"delivered"}]`); rec.Code != 204 {
+	if rec := do(t, h, "POST", "/api/messages/1a2b3c4d", `[{"t":"msg","id":1,"text":"hi\nthere"}, {"t":"status","id":1,"status":"delivered"}]`); rec.Code != 204 {
 		t.Fatalf("append: %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := do(t, h, "POST", "/api/messages/a0cbd018", `[{"t":"msg","id":2,"text":"second"}]`); rec.Code != 204 {
+	if rec := do(t, h, "POST", "/api/messages/1a2b3c4d", `[{"t":"msg","id":2,"text":"second"}]`); rec.Code != 204 {
 		t.Fatalf("append 2: %d", rec.Code)
 	}
 
 	// Simulate a write cut short by the drive disconnecting.
-	path := filepath.Join(s.root, "data", "messages", "a0cbd018.jsonl")
+	path := filepath.Join(s.root, "data", "messages", "1a2b3c4d.jsonl")
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func TestMessagesRoundTrip(t *testing.T) {
 	f.WriteString(`{"t":"msg","id":3,"te`)
 	f.Close()
 
-	rec := do(t, h, "GET", "/api/messages/a0cbd018", "")
+	rec := do(t, h, "GET", "/api/messages/1a2b3c4d", "")
 	body := rec.Body.String()
 	if rec.Code != 200 || strings.Count(body, `"t":"`) != 3 || strings.Contains(body, `"id":3`) {
 		t.Fatalf("history: %d %s", rec.Code, body)
@@ -67,12 +67,12 @@ func TestMessagesRejectsBadInput(t *testing.T) {
 		want              int
 	}{
 		{"GET", "/api/messages/..%2f..%2fx", "", 400},
-		{"GET", "/api/messages/A0CBD018", "", 400},
-		{"GET", "/api/messages/a0cbd01", "", 400},
-		{"POST", "/api/messages/a0cbd018", `{"t":"msg"}`, 400},
-		{"POST", "/api/messages/a0cbd018", `[1, 2]`, 400},
-		{"POST", "/api/messages/a0cbd018", `["x"]`, 400},
-		{"POST", "/api/messages/a0cbd018", `[{"text":"` + strings.Repeat("x", maxMessageRecord) + `"}]`, 413},
+		{"GET", "/api/messages/1A2B3C4D", "", 400}, // uppercase isn't accepted
+		{"GET", "/api/messages/1a2b3c4", "", 400},  // too short
+		{"POST", "/api/messages/1a2b3c4d", `{"t":"msg"}`, 400},
+		{"POST", "/api/messages/1a2b3c4d", `[1, 2]`, 400},
+		{"POST", "/api/messages/1a2b3c4d", `["x"]`, 400},
+		{"POST", "/api/messages/1a2b3c4d", `[{"text":"` + strings.Repeat("x", maxMessageRecord) + `"}]`, 413},
 	}
 	for _, c := range cases {
 		if rec := do(t, h, c.method, c.url, c.body); rec.Code != c.want {
@@ -87,7 +87,7 @@ func TestMessagesRejectsBadInput(t *testing.T) {
 func TestMessagesNeedLibrary(t *testing.T) {
 	s, h := newMessagesServer(t)
 	os.Remove(filepath.Join(s.root, "library.json")) // drive unplugged
-	if rec := do(t, h, "POST", "/api/messages/a0cbd018", `[{"t":"msg"}]`); rec.Code != 503 {
+	if rec := do(t, h, "POST", "/api/messages/1a2b3c4d", `[{"t":"msg"}]`); rec.Code != 503 {
 		t.Fatalf("want 503, got %d", rec.Code)
 	}
 	if _, err := os.Stat(filepath.Join(s.root, "data")); err == nil {

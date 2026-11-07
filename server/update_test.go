@@ -107,6 +107,13 @@ func TestUpdateCheckErrors(t *testing.T) {
 	}
 }
 
+func TestBrowserEnvDropsToken(t *testing.T) {
+	got := browserEnv([]string{"PATH=/bin", "OLIB_GITHUB_TOKEN=secret", "olib_update_api=x", "HOME=/h"})
+	if strings.Join(got, ";") != "PATH=/bin;HOME=/h" {
+		t.Fatalf("got %v", got)
+	}
+}
+
 func TestUpdateCheckOffline(t *testing.T) {
 	old := githubAPI
 	githubAPI = "http://127.0.0.1:1" // nothing listens on port 1
