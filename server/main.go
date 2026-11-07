@@ -159,6 +159,8 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("GET /api/packs/{id}/zim", s.handleZimInfo)
 	mux.HandleFunc("GET /api/packs/{id}/search", s.handleZimSearch)
 	mux.HandleFunc("GET /content/{pack}/{path...}", s.handleContent)
+	mux.HandleFunc("GET /api/messages/{radio}", s.handleGetMessages)
+	mux.HandleFunc("POST /api/messages/{radio}", s.handleAppendMessages)
 
 	ui, err := fs.Sub(webFS, "webdist")
 	if err != nil {

@@ -8,9 +8,11 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [tailwindcss(), svelte()],
   resolve: {
-    alias: {
-      $lib: path.resolve('./src/lib'),
-    },
+    alias: [
+      { find: '$lib', replacement: path.resolve('./src/lib') },
+      // @meshtastic/core bundles a logger that imports Node built-ins.
+      { find: /^(os|path|util)$/, replacement: path.resolve('./src/messages/node-shim.ts') },
+    ],
   },
   build: {
     outDir: '../server/webdist',

@@ -7,3 +7,7 @@ test-drive/OfflineLibrary/packs/regional-maps/assets/
 tools/
 server/webdist/*
 !server/webdist/.gitkeep
+# Message history written while testing Messages
+test-drive/OfflineLibrary/data/
+# Radio config backups contain channel and private encryption keys
+backups/

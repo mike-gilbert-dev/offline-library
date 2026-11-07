@@ -11,6 +11,7 @@
   import UnplugIcon from '@lucide/svelte/icons/unplug';
   import ServerOffIcon from '@lucide/svelte/icons/server-off';
   import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+  import MailIcon from '@lucide/svelte/icons/mail';
 
   let lib = $state<Library | null>(null);
   let loadError = $state('');
@@ -81,7 +82,13 @@
   const readyCount = $derived(lib?.packs.filter((p) => p.status === 'ok').length ?? 0);
 </script>
 
-{#if route && viewerPack && contentOrigin && !serverDown && lib?.available}
+{#if hash.startsWith('#/messages')}
+  <!-- Messages is built in (not a pack). The radio libraries are ~500 KB, so
+       they load only when Messages is opened. -->
+  {#await import('./messages/Messages.svelte') then { default: Messages }}
+    <Messages />
+  {/await}
+{:else if route && viewerPack && contentOrigin && !serverDown && lib?.available}
   {#key route.packId}
     {#if viewerPack.manifest?.format === 'pmtiles'}
       <!-- MapLibre is ~1 MB, so it is only loaded when a map is opened. -->
@@ -109,10 +116,15 @@
         {/if}
       </div>
     </div>
-    <Button variant="outline" onclick={() => refresh(true)} disabled={scanning || serverDown}>
-      <RefreshCwIcon data-icon="inline-start" class={scanning ? 'animate-spin' : ''} />
-      {scanning ? 'Scanning…' : 'Rescan'}
-    </Button>
+    <div class="flex items-center gap-2">
+      <Button variant="outline" href="#/messages">
+        <MailIcon data-icon="inline-start" /> Messages
+      </Button>
+      <Button variant="outline" onclick={() => refresh(true)} disabled={scanning || serverDown}>
+        <RefreshCwIcon data-icon="inline-start" class={scanning ? 'animate-spin' : ''} />
+        {scanning ? 'Scanning…' : 'Rescan'}
+      </Button>
+    </div>
   </div>
 </header>
 
