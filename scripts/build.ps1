@@ -72,6 +72,20 @@ $sums = Get-ChildItem $dist -File | Sort-Object Name | ForEach-Object {
 }
 [IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'), (($sums -join "`n") + "`n"))
 
+if ($Version -ne 'dev') {
+  # release.json: what the in-app updater installs. scripts/release.ps1 signs
+  # it; the launcher verifies the signature (server/releasekey.go).
+  Write-Host '== Writing release.json'
+  $files = [ordered]@{}
+  # Launchers only: the .command helper ships in the zip (GitHub renames
+  # asset names containing spaces, so the updater couldn't fetch it by name).
+  Get-ChildItem $dist -File -Filter 'start-*' | Sort-Object Name | ForEach-Object {
+    $files[$_.Name] = [ordered]@{ sha256 = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower(); size = $_.Length }
+  }
+  $manifest = [ordered]@{ schema = 1; version = $Version; files = $files } | ConvertTo-Json -Depth 4 -Compress
+  [IO.File]::WriteAllText((Join-Path $dist 'release.json'), $manifest + "`n")  # UTF-8, no BOM
+}
+
 Write-Host '== Copying test library'
 Copy-Item -Recurse (Join-Path $root 'test-drive\OfflineLibrary') (Join-Path $dist 'OfflineLibrary')
 

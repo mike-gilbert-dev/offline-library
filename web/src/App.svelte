@@ -12,6 +12,8 @@
   import ServerOffIcon from '@lucide/svelte/icons/server-off';
   import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
   import MailIcon from '@lucide/svelte/icons/mail';
+  import SettingsIcon from '@lucide/svelte/icons/settings';
+  import Settings from './Settings.svelte';
 
   let lib = $state<Library | null>(null);
   let loadError = $state('');
@@ -94,6 +96,8 @@
   {#await import('./messages/Messages.svelte') then { default: Messages }}
     <Messages />
   {/await}
+{:else if hash.startsWith('#/settings')}
+  <Settings />
 {:else if route && viewerPack && contentOrigin && !serverDown && lib?.available}
   {#key route.packId}
     {#if viewerPack.manifest?.format === 'pmtiles'}
@@ -129,6 +133,9 @@
       <Button variant="outline" onclick={() => refresh(true)} disabled={scanning || serverDown}>
         <RefreshCwIcon data-icon="inline-start" class={scanning ? 'animate-spin' : ''} />
         {scanning ? 'Scanning…' : 'Rescan'}
+      </Button>
+      <Button variant="outline" size="icon" href="#/settings" aria-label="Settings" title="Settings">
+        <SettingsIcon />
       </Button>
     </div>
   </div>

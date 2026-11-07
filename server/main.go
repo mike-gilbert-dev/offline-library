@@ -45,6 +45,9 @@ type server struct {
 	dev         bool
 
 	archives archiveSet
+
+	updates updater
+	restart chan struct{} // the updater signals here once new launchers are in place
 }
 
 func main() {
@@ -52,6 +55,7 @@ func main() {
 	port := flag.Int("port", 0, "port to listen on (default: any free port)")
 	noBrowser := flag.Bool("no-browser", false, "don't open a browser window")
 	dev := flag.Bool("dev", false, "development mode: port 8787, no access token, for use with the Vite dev server")
+	restarted := flag.Bool("restarted", false, "internal: set by the updater when it restarts the launcher")
 	flag.Parse()
 
 	root, err := resolveLibraryRoot(*libFlag)
@@ -63,7 +67,18 @@ func main() {
 	}
 
 	// Loopback only: the library is never reachable from the network.
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *port))
+	// After an update on Windows, the previous launcher may still be letting
+	// go of a fixed port, so retry briefly.
+	listen := func(port int) (net.Listener, error) {
+		for attempt := 0; ; attempt++ {
+			ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+			if err == nil || !*restarted || port == 0 || attempt >= 50 {
+				return ln, err
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	ln, err := listen(*port)
 	if err != nil {
 		log.Fatalf("could not start the local server: %v", err)
 	}
@@ -74,12 +89,12 @@ func main() {
 	if *dev {
 		contentPort = *port + 1
 	}
-	cln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", contentPort))
+	cln, err := listen(contentPort)
 	if err != nil {
 		log.Fatalf("could not start the local content server: %v", err)
 	}
 
-	s := &server{root: root, token: randomToken(), host: ln.Addr().String(), contentHost: cln.Addr().String(), dev: *dev}
+	s := &server{root: root, token: randomToken(), host: ln.Addr().String(), contentHost: cln.Addr().String(), dev: *dev, restart: make(chan struct{}, 1)}
 	s.lib = Scan(root)
 
 	srv := &http.Server{Handler: s.routes(), ReadHeaderTimeout: 10 * time.Second}
@@ -114,14 +129,51 @@ func main() {
 		}
 	}
 
+	// This version is running, so launchers left over from an update are no
+	// longer needed as a fallback.
+	if dir, _, err := launcherLocation(); err == nil {
+		go cleanupAfterUpdate(dir)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	<-ctx.Done()
+	restarting := false
+	select {
+	case <-ctx.Done():
+	case <-s.restart:
+		restarting = true
+		fmt.Println()
+		fmt.Println("Update installed. Restarting...") // ASCII: Windows consoles mangle "…"
+	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
 	_ = csrv.Shutdown(shutdownCtx)
 	s.archives.closeAll()
+
+	if restarting {
+		dir, name, err := launcherLocation()
+		if err == nil {
+			err = restartSelf(filepath.Join(dir, name), restartArgs(os.Args[1:]))
+		}
+		if err != nil {
+			fmt.Println("The update was installed, but the library couldn't restart itself:", err)
+			fmt.Println("Start it again from the drive.")
+			os.Exit(1)
+		}
+	}
+}
+
+// restartArgs keeps the user's original flags and marks the new process as
+// started by the updater.
+func restartArgs(args []string) []string {
+	out := make([]string, 0, len(args)+1)
+	for _, a := range args {
+		if a != "-restarted" && a != "--restarted" {
+			out = append(out, a)
+		}
+	}
+	return append(out, "-restarted")
 }
 
 // resolveLibraryRoot picks the library folder: the -library flag, else an
@@ -165,6 +217,9 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("GET /content/{pack}/{path...}", s.handleContent)
 	mux.HandleFunc("GET /api/messages/{radio}", s.handleGetMessages)
 	mux.HandleFunc("POST /api/messages/{radio}", s.handleAppendMessages)
+	mux.HandleFunc("GET /api/update/check", s.handleUpdateCheck)
+	mux.HandleFunc("POST /api/update/install", s.handleUpdateInstall)
+	mux.HandleFunc("GET /api/update/status", s.handleUpdateStatus)
 
 	ui, err := fs.Sub(webFS, "webdist")
 	if err != nil {
