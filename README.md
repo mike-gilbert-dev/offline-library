@@ -130,6 +130,16 @@ Tests: `cd server; go test ./...`
 - Maps support browsing and zooming only. Place search and routing are separate features.
 - Headless Edge with SwiftShader draws only the map background, so check maps in a real browser.
 
+## Finding packs: search, tags and pages
+
+- The library page has a search box, tag filters and pages (12, 24, 48 or 96 packs per page).
+- Search matches every typed word against a pack's title, description, category, format, source and tags.
+- Selecting several tags shows only packs that have all of them. The **untagged** filter helps you find packs you haven't sorted yet.
+- Tags belong to the user. Add or remove them with **Add tags**/**Edit tags** on a pack's card; rename, merge or delete them in **Settings → Tags**.
+- Tags are lowercased, can be up to 40 characters, and a pack can have up to 30 of them.
+- They're stored in `OfflineLibrary/data/tags.json`, keyed by `packId`, never in `pack.json`. Replacing a pack keeps its tags, and tags for packs that aren't currently listed are kept.
+- The file is rewritten atomically (temp file + rename). If it gets damaged, the app refuses to overwrite it and says so.
+
 ## Messages (Meshtastic)
 
 - Built into the app (the **Messages** button), not a pack. It needs Chrome,

@@ -2,7 +2,10 @@
   import { onMount } from 'svelte';
   import * as Alert from '$lib/components/ui/alert/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import type { Library } from '$lib/types.js';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { badgeVariants } from '$lib/components/ui/badge/index.js';
+  import type { Library, Pack } from '$lib/types.js';
+  import { tagStore } from '$lib/tags.svelte.js';
   import PackCard from './PackCard.svelte';
   import Viewer from './Viewer.svelte';
 
@@ -13,6 +16,10 @@
   import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
   import MailIcon from '@lucide/svelte/icons/mail';
   import SettingsIcon from '@lucide/svelte/icons/settings';
+  import SearchIcon from '@lucide/svelte/icons/search';
+  import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+  import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+  import XIcon from '@lucide/svelte/icons/x';
   import Settings from './Settings.svelte';
 
   let lib = $state<Library | null>(null);
@@ -32,6 +39,7 @@
       lib = await api<Library>(rescan ? '/api/rescan' : '/api/library', rescan ? { method: 'POST' } : undefined);
       loadError = '';
       serverDown = false;
+      if (lib.available) tagStore.load();
     } catch (e) {
       loadError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -88,6 +96,84 @@
   });
 
   const readyCount = $derived(lib?.packs.filter((p) => p.status === 'ok').length ?? 0);
+
+  // ---- Search, tag filter and pages ----
+  // Kept for the browser tab (sessionStorage) so a reload doesn't lose your
+  // place; going into a pack and back keeps it anyway because App stays mounted.
+  const UNTAGGED = '\u0000untagged'; // can't collide with a real tag
+  const PAGE_SIZES = [12, 24, 48, 96];
+  const saved = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('olib-filter') ?? '{}');
+    } catch {
+      return {};
+    }
+  })();
+  let query = $state<string>(typeof saved.query === 'string' ? saved.query : '');
+  let activeTags = $state<string[]>(Array.isArray(saved.tags) ? saved.tags : []);
+  let pageSize = $state<number>(PAGE_SIZES.includes(saved.pageSize) ? saved.pageSize : 24);
+  let page = $state<number>(Number.isInteger(saved.page) ? saved.page : 1);
+
+  $effect(() => {
+    try {
+      sessionStorage.setItem('olib-filter', JSON.stringify({ query, tags: activeTags, pageSize, page }));
+    } catch {
+      // private window or storage blocked: filters just won't survive a reload
+    }
+  });
+
+  // Tags that no longer exist (renamed or deleted in Settings) stop filtering.
+  $effect(() => {
+    if (!tagStore.loaded) return;
+    const known = new Set(tagStore.all.map((t) => t.tag));
+    const kept = activeTags.filter((t) => t === UNTAGGED || known.has(t));
+    if (kept.length !== activeTags.length) activeTags = kept;
+  });
+
+  function toggleTag(tag: string) {
+    activeTags = activeTags.includes(tag) ? activeTags.filter((t) => t !== tag) : [...activeTags, tag];
+    page = 1;
+  }
+
+  function clearFilters() {
+    query = '';
+    activeTags = [];
+    page = 1;
+  }
+
+  function searchText(p: Pack): string {
+    const m = p.manifest;
+    if (!m) return p.manifestPath.toLowerCase();
+    return [m.title, m.description, m.category, m.format, m.packId, m.source?.name, ...tagStore.of(m.packId)]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+  }
+
+  // Every word typed must appear somewhere, and the pack must have every
+  // selected tag, so each extra word or tag narrows the list.
+  const filtered = $derived.by(() => {
+    if (!lib) return [];
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    return lib.packs.filter((p) => {
+      const tags = tagStore.of(p.manifest?.packId);
+      if (activeTags.some((t) => (t === UNTAGGED ? tags.length > 0 : !tags.includes(t)))) return false;
+      if (!words.length) return true;
+      const text = searchText(p);
+      return words.every((w) => text.includes(w));
+    });
+  });
+
+  const pageCount = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const currentPage = $derived(Math.min(Math.max(1, page), pageCount));
+  const pagePacks = $derived(filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize));
+  const filtering = $derived(query.trim() !== '' || activeTags.length > 0);
+  const untaggedCount = $derived(lib?.packs.filter((p) => p.manifest && !tagStore.of(p.manifest.packId).length).length ?? 0);
+
+  function goToPage(n: number) {
+    page = Math.min(Math.max(1, n), pageCount);
+    window.scrollTo({ top: 0 });
+  }
 </script>
 
 {#if hash.startsWith('#/messages')}
@@ -182,11 +268,93 @@
     {#if lib.packs.length === 0}
       <p class="text-muted-foreground text-sm">This library doesn't list any packs yet.</p>
     {:else}
+      <div class="mb-6 flex flex-col gap-3">
+        <div class="relative">
+          <SearchIcon class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            type="search"
+            bind:value={query}
+            oninput={() => (page = 1)}
+            placeholder="Search titles, descriptions and tags"
+            aria-label="Search packs"
+            class="pl-8"
+          />
+        </div>
+
+        {#if tagStore.error}
+          <p class="text-destructive text-sm">{tagStore.error}</p>
+        {/if}
+
+        {#if tagStore.all.length}
+          <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by tag">
+            <span class="text-muted-foreground mr-1 text-xs">Tags:</span>
+            {#each tagStore.all as { tag, count } (tag)}
+              <button
+                type="button"
+                class={badgeVariants({ variant: activeTags.includes(tag) ? 'default' : 'outline' })}
+                aria-pressed={activeTags.includes(tag)}
+                onclick={() => toggleTag(tag)}
+              >
+                {tag} <span class="opacity-60">{count}</span>
+              </button>
+            {/each}
+            {#if untaggedCount}
+              <button
+                type="button"
+                class="{badgeVariants({ variant: activeTags.includes(UNTAGGED) ? 'default' : 'outline' })} italic"
+                aria-pressed={activeTags.includes(UNTAGGED)}
+                onclick={() => toggleTag(UNTAGGED)}
+              >
+                untagged <span class="opacity-60">{untaggedCount}</span>
+              </button>
+            {/if}
+          </div>
+        {/if}
+
+        <div class="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span>
+            {#if filtered.length === 0}
+              No packs match
+            {:else}
+              Showing {(currentPage - 1) * pageSize + 1}–{(currentPage - 1) * pageSize + pagePacks.length}
+              of {filtered.length}{filtering ? ` matching (${lib.packs.length} total)` : ''}
+            {/if}
+            {#if filtering}
+              <Button variant="link" size="sm" class="h-auto px-1" onclick={clearFilters}>
+                <XIcon data-icon="inline-start" /> Clear filters
+              </Button>
+            {/if}
+          </span>
+          <label class="flex items-center gap-2">
+            Per page
+            <select
+              class="border-input dark:bg-input/30 h-8 rounded-md border bg-transparent px-2 text-sm"
+              bind:value={pageSize}
+              onchange={() => (page = 1)}
+            >
+              {#each PAGE_SIZES as n (n)}<option value={n}>{n}</option>{/each}
+            </select>
+          </label>
+        </div>
+      </div>
+
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {#each lib.packs as pack (pack.manifestPath)}
-          <PackCard {pack} />
+        {#each pagePacks as pack (pack.manifestPath)}
+          <PackCard {pack} activeTags={activeTags} onTagClick={toggleTag} />
         {/each}
       </div>
+
+      {#if pageCount > 1}
+        <nav class="mt-6 flex items-center justify-center gap-3" aria-label="Pages">
+          <Button variant="outline" size="sm" onclick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
+            <ChevronLeftIcon data-icon="inline-start" /> Previous
+          </Button>
+          <span class="text-muted-foreground text-sm">Page {currentPage} of {pageCount}</span>
+          <Button variant="outline" size="sm" onclick={() => goToPage(currentPage + 1)} disabled={currentPage === pageCount}>
+            Next <ChevronRightIcon data-icon="inline-end" />
+          </Button>
+        </nav>
+      {/if}
     {/if}
 
     <p class="text-muted-foreground mt-10 text-xs">

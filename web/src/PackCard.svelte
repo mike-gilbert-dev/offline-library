@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Component } from 'svelte';
   import * as Card from '$lib/components/ui/card/index.js';
-  import { Badge, type BadgeVariant } from '$lib/components/ui/badge/index.js';
+  import { Badge, badgeVariants, type BadgeVariant } from '$lib/components/ui/badge/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { normalizeTag, tagStore } from '$lib/tags.svelte.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import type { Pack, PackStatus } from '$lib/types.js';
 
@@ -15,8 +17,14 @@
   import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
   import CircleXIcon from '@lucide/svelte/icons/circle-x';
   import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right';
+  import TagIcon from '@lucide/svelte/icons/tag';
+  import XIcon from '@lucide/svelte/icons/x';
 
-  let { pack }: { pack: Pack } = $props();
+  let {
+    pack,
+    activeTags = [],
+    onTagClick,
+  }: { pack: Pack; activeTags?: string[]; onTagClick?: (tag: string) => void } = $props();
 
   const m = $derived(pack.manifest);
 
@@ -58,6 +66,52 @@
       : [],
   );
 
+  // ---- Tags ----
+  const tags = $derived(tagStore.of(m?.packId));
+  let editing = $state(false);
+  let draft = $state('');
+  let saving = $state(false);
+  let tagInput = $state<HTMLInputElement | null>(null);
+  const datalistId = $derived(`tag-suggestions-${m?.packId}`);
+  const suggestions = $derived(tagStore.all.map((t) => t.tag).filter((t) => !tags.includes(t)));
+
+  async function saveTags(next: string[]) {
+    if (!m) return;
+    saving = true;
+    await tagStore.setPackTags(m.packId, next);
+    saving = false;
+  }
+
+  async function addDraft() {
+    // Commas separate several tags typed at once: "hunting, recipes".
+    const added = draft.split(',').map(normalizeTag).filter((t) => t && !tags.includes(t));
+    draft = '';
+    if (added.length) await saveTags([...tags, ...added]);
+    tagInput?.focus();
+  }
+
+  function onTagKey(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addDraft();
+    } else if (e.key === 'Escape') {
+      draft = '';
+      editing = false;
+    } else if (e.key === 'Backspace' && draft === '' && tags.length) {
+      saveTags(tags.slice(0, -1));
+    }
+  }
+
+  function startEditing() {
+    editing = true;
+    queueMicrotask(() => tagInput?.focus());
+  }
+
+  async function finishEditing() {
+    if (draft.trim()) await addDraft();
+    editing = false;
+  }
+
   function formatBytes(n: number) {
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     let i = 0;
@@ -97,6 +151,68 @@
           </div>
         {/each}
       </dl>
+    {/if}
+
+    {#if m && editing}
+      <div class="flex flex-col gap-2">
+        <div class="flex flex-wrap gap-1.5">
+          {#each tags as tag (tag)}
+            <Badge variant="secondary" class="pr-1">
+              {tag}
+              <button
+                type="button"
+                class="hover:bg-foreground/10 rounded-full p-0.5"
+                aria-label="Remove tag {tag}"
+                disabled={saving}
+                onclick={() => saveTags(tags.filter((t) => t !== tag))}
+              >
+                <XIcon class="size-3" />
+              </button>
+            </Badge>
+          {:else}
+            <span class="text-muted-foreground text-xs">No tags yet.</span>
+          {/each}
+        </div>
+        <div class="flex gap-2">
+          <Input
+            bind:ref={tagInput}
+            bind:value={draft}
+            onkeydown={onTagKey}
+            list={datalistId}
+            maxlength={200}
+            placeholder="Add a tag, then press Enter"
+            aria-label="Add a tag to {m.title}"
+            class="h-8"
+          />
+          <datalist id={datalistId}>
+            {#each suggestions as s (s)}<option value={s}></option>{/each}
+          </datalist>
+          <Button size="sm" variant="outline" onclick={finishEditing} disabled={saving}>Done</Button>
+        </div>
+      </div>
+    {:else if m}
+      <div class="flex flex-wrap items-center gap-1.5">
+        {#each tags as tag (tag)}
+          <button
+            type="button"
+            class={badgeVariants({ variant: activeTags.includes(tag) ? 'default' : 'outline' })}
+            title={activeTags.includes(tag) ? `Stop filtering by "${tag}"` : `Show packs tagged "${tag}"`}
+            aria-pressed={activeTags.includes(tag)}
+            onclick={() => onTagClick?.(tag)}
+          >
+            {tag}
+          </button>
+        {/each}
+        <button
+          type="button"
+          class="{badgeVariants({ variant: 'ghost' })} text-muted-foreground"
+          onclick={startEditing}
+          disabled={!tagStore.loaded}
+        >
+          <TagIcon data-icon="inline-start" />
+          {tags.length ? 'Edit tags' : 'Add tags'}
+        </button>
+      </div>
     {/if}
 
     {#if pack.problems.length}

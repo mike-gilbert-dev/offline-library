@@ -218,6 +218,9 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("GET /content/{pack}/{path...}", s.handleContent)
 	mux.HandleFunc("GET /api/messages/{radio}", s.handleGetMessages)
 	mux.HandleFunc("POST /api/messages/{radio}", s.handleAppendMessages)
+	mux.HandleFunc("GET /api/tags", s.handleGetTags)
+	mux.HandleFunc("POST /api/tags/rename", s.handleRenameTag)
+	mux.HandleFunc("POST /api/tags/pack/{pack}", s.handleSetPackTags)
 	mux.HandleFunc("GET /api/update/check", s.handleUpdateCheck)
 	mux.HandleFunc("POST /api/update/install", s.handleUpdateInstall)
 	mux.HandleFunc("GET /api/update/status", s.handleUpdateStatus)
@@ -251,7 +254,7 @@ func (s *server) guard(next http.Handler) http.Handler {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-		if r.Method == http.MethodPost {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			if o := r.Header.Get("Origin"); o != "" && o != "http://"+s.host {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return

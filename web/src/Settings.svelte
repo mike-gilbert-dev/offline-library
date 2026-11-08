@@ -4,6 +4,7 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
+  import TagManager from './TagManager.svelte';
 
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
@@ -128,6 +129,8 @@
 </header>
 
 <main class="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+  <TagManager />
+
   <Card.Root>
     <Card.Header>
       <Card.Title>Updates</Card.Title>
